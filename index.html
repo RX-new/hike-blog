@@ -183,6 +183,66 @@
         }
         .map-btn:active { background: #0958D9; }
 
+        .xhs-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 8px 18px; background: #FF2442; color: white;
+            border-radius: 20px; font-size: 13px; cursor: pointer;
+            border: none; font-family: inherit;
+        }
+        .xhs-btn:active { background: #d41836; }
+
+        /* ── 小红书弹窗 ── */
+        .xhs-modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.55); z-index: 9998;
+            align-items: flex-end; justify-content: center;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .xhs-modal.show { display: flex; }
+        .xhs-panel {
+            background: #fff; border-radius: 20px 20px 0 0;
+            width: 100%; max-width: 700px;
+            padding: 20px 20px 32px; max-height: 85vh;
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        .xhs-panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .xhs-panel-header h3 {
+            font-size: 16px; font-weight: 700; color: #FF2442;
+        }
+        .xhs-panel-header .close-x {
+            font-size: 22px; cursor: pointer; color: #999; line-height: 1;
+        }
+        .xhs-preview {
+            background: #FFF5F6; border: 1.5px solid #FFD6DC;
+            border-radius: 14px; padding: 14px 16px;
+            font-size: 14px; line-height: 1.85; white-space: pre-wrap;
+            word-break: break-all; color: #333; margin-bottom: 14px;
+            min-height: 160px;
+        }
+        .xhs-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .xhs-copy-btn {
+            flex: 1; padding: 12px; background: #FF2442; color: white;
+            border: none; border-radius: 14px; font-size: 15px;
+            font-weight: 700; cursor: pointer; font-family: inherit;
+        }
+        .xhs-copy-btn.copied { background: #4CAF50; }
+        .xhs-tip {
+            margin-top: 10px; font-size: 12px; color: #999; line-height: 1.8;
+        }
+        .xhs-tag-row {
+            display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
+        }
+        .xhs-tag {
+            padding: 4px 12px; border-radius: 20px;
+            border: 1.5px solid #FFD6DC; background: #FFF5F6;
+            font-size: 12px; color: #FF2442; cursor: pointer;
+        }
+        .xhs-tag.on { background: #FF2442; color: white; border-color: #FF2442; }
+        .xhs-label { font-size: 12px; color: #999; margin-bottom: 6px; }
+
         /* ── 空状态 ── */
         .empty-state {
             text-align: center; padding: 80px 20px;
@@ -256,6 +316,23 @@
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
     <span class="lightbox-close">✕</span>
     <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- ▸ 小红书文案弹窗 -->
+<div class="xhs-modal" id="xhsModal" onclick="if(event.target===this)closeXHS()">
+    <div class="xhs-panel">
+        <div class="xhs-panel-header">
+            <h3>📕 小红书文案生成</h3>
+            <span class="close-x" onclick="closeXHS()">✕</span>
+        </div>
+        <div class="xhs-label">选择话题标签（可多选）：</div>
+        <div class="xhs-tag-row" id="xhsTagRow"></div>
+        <div class="xhs-preview" id="xhsPreview"></div>
+        <div class="xhs-actions">
+            <button class="xhs-copy-btn" id="xhsCopyBtn" onclick="copyXHS()">📋 复制文案</button>
+        </div>
+        <div class="xhs-tip">① 复制后打开小红书 App → 发布 → 粘贴文字<br>② 从手机相册选本次徒步的照片<br>③ 位置标签填上地点名称，发布！</div>
+    </div>
 </div>
 
 <script>
@@ -381,6 +458,9 @@ function renderPosts() {
             ? `<a class="map-btn" href="${p.mapUrl}" target="_blank" onclick="event.stopPropagation()">📍 打开导航</a>`
             : '';
 
+        // 小红书按钮
+        const xhsHtml = `<button class="xhs-btn" onclick="openXHS(${idx});event.stopPropagation()">📕 生成小红书文案</button>`;
+
         html += `
         <div class="post-card" id="card-${idx}" onclick="toggleCard(${idx})">
             ${coverHtml}
@@ -402,7 +482,7 @@ function renderPosts() {
                 <div class="detail-sep"></div>
                 ${hlHtml}
                 ${photoHtml}
-                <div class="action-row">${mapHtml}</div>
+                <div class="action-row">${mapHtml}${xhsHtml}</div>
             </div>
         </div>`;
     });
@@ -425,6 +505,78 @@ function openLightbox(src) {
 }
 function closeLightbox() {
     document.getElementById('lightbox').classList.remove('show');
+}
+
+// ── 小红书功能 ──
+const ALL_TAGS = [
+    '#上海徒步', '#周末徒步', '#亲子徒步', '#自然探索',
+    '#樱花打卡', '#上海公园', '#徒步日记', '#带娃出行',
+    '#户外探险', '#城市徒步'
+];
+let xhsPost = null;
+let activeTags = new Set(['#上海徒步', '#周末徒步', '#徒步日记']);
+
+function openXHS(idx) {
+    const sorted = [...POSTS].sort((a,b) => b.date.localeCompare(a.date));
+    xhsPost = sorted[idx];
+    renderXHSTags();
+    renderXHSPreview();
+    document.getElementById('xhsModal').classList.add('show');
+    document.getElementById('xhsCopyBtn').textContent = '📋 复制文案';
+    document.getElementById('xhsCopyBtn').classList.remove('copied');
+}
+function closeXHS() {
+    document.getElementById('xhsModal').classList.remove('show');
+}
+function renderXHSTags() {
+    document.getElementById('xhsTagRow').innerHTML = ALL_TAGS.map(tag =>
+        `<span class="xhs-tag ${activeTags.has(tag) ? 'on' : ''}" onclick="toggleTag('${tag}')">${tag}</span>`
+    ).join('');
+}
+function toggleTag(tag) {
+    activeTags.has(tag) ? activeTags.delete(tag) : activeTags.add(tag);
+    renderXHSTags();
+    renderXHSPreview();
+}
+function renderXHSPreview() {
+    if (!xhsPost) return;
+    const p = xhsPost;
+    const diffEmo = { easy: '🟢', medium: '🟡', hard: '🔴' }[p.difficulty] || '🌿';
+    const months = ['','一','二','三','四','五','六','七','八','九','十','十一','十二'];
+    const d = new Date(p.date);
+    const dateStr = `${d.getFullYear()}年${months[d.getMonth()+1]}月${d.getDate()}日`;
+
+    let text = `${p.coverEmoji || '🌿'} ${p.title}\n\n`;
+    text += `📅 ${dateStr}\n`;
+    text += `📍 ${p.location}\n`;
+    text += `🥾 ${p.distance} km  ⏱ ${fmtHours(p.duration)}  ${diffEmo} ${diffLabel(p.difficulty)}\n\n`;
+    text += `${p.description}\n`;
+
+    if (p.highlights && p.highlights.length) {
+        text += `\n✨ 今日高光：\n`;
+        p.highlights.forEach(h => { text += `· ${h}\n`; });
+    }
+
+    text += `\n${[...activeTags].join(' ')}`;
+    document.getElementById('xhsPreview').textContent = text;
+}
+function copyXHS() {
+    const txt = document.getElementById('xhsPreview').textContent;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(txt).then(() => {
+            const btn = document.getElementById('xhsCopyBtn');
+            btn.textContent = '✅ 已复制！去小红书粘贴吧';
+            btn.classList.add('copied');
+        });
+    } else {
+        const ta = document.createElement('textarea');
+        ta.value = txt; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        const btn = document.getElementById('xhsCopyBtn');
+        btn.textContent = '✅ 已复制！';
+        btn.classList.add('copied');
+    }
 }
 
 calcStats();
