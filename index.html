@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>RX 徒步日记</title>
+    <style>
+        :root {
+            --green-dark: #1B4332;
+            --green: #2D6A4F;
+            --green-mid: #52B788;
+            --green-light: #D8F3DC;
+            --orange: #E76F51;
+            --yellow: #F4A261;
+            --bg: #F4F7F4;
+            --card: #FFFFFF;
+            --text: #1C1C1E;
+            --muted: #6B7280;
+            --border: #E5E7EB;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* ── 顶部 Header ── */
+        .hero {
+            background: linear-gradient(160deg, var(--green-dark) 0%, var(--green) 100%);
+            color: white;
+            padding: 50px 20px 35px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: "🌿 🌲 🏔️ 🌿 🌾 🌲 🌿 🌲 🏔️ 🌿 🌾 🌲";
+            position: absolute; top: 8px; left: 0; right: 0;
+            font-size: 18px; letter-spacing: 4px; opacity: 0.12;
+            white-space: nowrap; overflow: hidden;
+        }
+        .hero h1 { font-size: 30px; font-weight: 800; letter-spacing: 3px; position: relative; }
+        .hero p { font-size: 14px; opacity: 0.7; margin-top: 6px; position: relative; }
+
+        .stats-row {
+            display: flex; justify-content: center; gap: 0;
+            margin-top: 28px; position: relative;
+        }
+        .stat-item {
+            text-align: center; padding: 0 22px;
+            border-right: 1px solid rgba(255,255,255,0.2);
+        }
+        .stat-item:last-child { border-right: none; }
+        .stat-num { font-size: 30px; font-weight: 800; }
+        .stat-label { font-size: 11px; opacity: 0.65; margin-top: 2px; letter-spacing: 1px; }
+
+        /* ── 筛选栏 ── */
+        .filter-bar {
+            display: flex; gap: 8px; padding: 16px 16px 0;
+            max-width: 800px; margin: 0 auto;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .filter-bar::-webkit-scrollbar { display: none; }
+        .filter-btn {
+            flex-shrink: 0; padding: 7px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 20px; font-size: 13px;
+            background: var(--card); cursor: pointer;
+            color: var(--muted); transition: all 0.2s;
+        }
+        .filter-btn.active {
+            background: var(--green); border-color: var(--green);
+            color: white; font-weight: 600;
+        }
+
+        /* ── 容器 ── */
+        .container { max-width: 800px; margin: 0 auto; padding: 16px 16px 80px; }
+
+        /* ── 年份分割 ── */
+        .year-sep {
+            display: flex; align-items: center; gap: 12px;
+            margin: 24px 0 12px; color: var(--muted); font-size: 13px; font-weight: 600;
+        }
+        .year-sep::before, .year-sep::after {
+            content: ''; flex: 1; height: 1px; background: var(--border);
+        }
+
+        /* ── 帖子卡片 ── */
+        .post-card {
+            background: var(--card);
+            border-radius: 18px; overflow: hidden;
+            margin-bottom: 14px;
+            box-shadow: 0 2px 14px rgba(0,0,0,0.06);
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .post-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.1); transform: translateY(-2px); }
+
+        .post-cover {
+            width: 100%; height: 180px;
+            object-fit: cover; display: block;
+            background: linear-gradient(135deg, #95D5B2, #52B788);
+        }
+        .post-cover-emoji {
+            width: 100%; height: 140px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 56px;
+        }
+
+        .post-body { padding: 16px 18px 14px; cursor: pointer; }
+
+        .post-meta {
+            display: flex; align-items: center; gap: 8px;
+            flex-wrap: wrap; margin-bottom: 7px;
+        }
+        .post-date { font-size: 12px; color: var(--muted); }
+        .post-loc { font-size: 12px; color: var(--muted); }
+        .post-loc::before { content: "📍 "; }
+
+        .diff-badge {
+            font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 700;
+        }
+        .diff-badge.easy   { background: #D1FAE5; color: #065F46; }
+        .diff-badge.medium { background: #FEF3C7; color: #92400E; }
+        .diff-badge.hard   { background: #FEE2E2; color: #991B1B; }
+
+        .post-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+
+        .post-nums {
+            display: flex; gap: 18px; margin-bottom: 10px;
+        }
+        .post-num { font-size: 13px; color: var(--muted); }
+        .post-num strong { color: var(--green); }
+
+        .post-excerpt { font-size: 14px; color: #4B5563; line-height: 1.75; }
+
+        .expand-hint {
+            font-size: 12px; color: var(--green); margin-top: 8px;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .expand-hint .arrow { transition: transform 0.25s; display: inline-block; }
+        .post-card.open .expand-hint .arrow { transform: rotate(180deg); }
+
+        /* ── 展开详情 ── */
+        .post-detail {
+            max-height: 0; overflow: hidden;
+            transition: max-height 0.35s ease;
+            padding: 0 18px;
+        }
+        .post-card.open .post-detail {
+            max-height: 2000px;
+            padding-bottom: 18px;
+        }
+
+        .detail-sep { height: 1px; background: var(--border); margin-bottom: 14px; }
+
+        .highlights { list-style: none; margin-bottom: 14px; }
+        .highlights li {
+            font-size: 13px; color: #374151;
+            padding: 5px 0 5px 22px; position: relative;
+            border-bottom: 1px solid #F9FAFB;
+        }
+        .highlights li::before { content: "✅"; position: absolute; left: 0; font-size: 12px; }
+
+        .photo-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 6px; margin-bottom: 14px;
+        }
+        .photo-grid img {
+            width: 100%; aspect-ratio: 1; object-fit: cover;
+            border-radius: 10px; cursor: pointer;
+        }
+
+        .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .map-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 8px 18px; background: #1677FF; color: white;
+            border-radius: 20px; font-size: 13px; text-decoration: none;
+        }
+        .map-btn:active { background: #0958D9; }
+
+        /* ── 空状态 ── */
+        .empty-state {
+            text-align: center; padding: 80px 20px;
+            color: var(--muted);
+        }
+        .empty-state .e-icon { font-size: 64px; margin-bottom: 16px; }
+        .empty-state p { font-size: 15px; line-height: 2; }
+
+        /* ── 图片灯箱 ── */
+        .lightbox {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.9); z-index: 9999;
+            align-items: center; justify-content: center;
+        }
+        .lightbox.show { display: flex; }
+        .lightbox img { max-width: 95vw; max-height: 90vh; border-radius: 8px; }
+        .lightbox-close {
+            position: absolute; top: 16px; right: 20px;
+            color: white; font-size: 32px; cursor: pointer; line-height: 1;
+        }
+
+        /* ── 手机适配 ── */
+        @media (max-width: 600px) {
+            .hero { padding: 36px 16px 28px; }
+            .hero h1 { font-size: 24px; }
+            .stat-item { padding: 0 14px; }
+            .stat-num { font-size: 24px; }
+            .post-cover { height: 150px; }
+            .post-title { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ▸ 顶部 Banner -->
+<header class="hero">
+    <h1>🥾 RX 徒步日记</h1>
+    <p>记录每一次走进自然的时刻</p>
+    <div class="stats-row">
+        <div class="stat-item">
+            <div class="stat-num" id="statCount">—</div>
+            <div class="stat-label">次徒步</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-num" id="statKm">—</div>
+            <div class="stat-label">公里</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-num" id="statPlaces">—</div>
+            <div class="stat-label">个地点</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-num" id="statHours">—</div>
+            <div class="stat-label">小时</div>
+        </div>
+    </div>
+</header>
+
+<!-- ▸ 筛选栏 -->
+<div class="filter-bar">
+    <button class="filter-btn active" onclick="filterPosts('all', this)">全部</button>
+    <button class="filter-btn" onclick="filterPosts('easy', this)">🟢 轻松</button>
+    <button class="filter-btn" onclick="filterPosts('medium', this)">🟡 适中</button>
+    <button class="filter-btn" onclick="filterPosts('hard', this)">🔴 挑战</button>
+</div>
+
+<!-- ▸ 帖子列表 -->
+<div class="container" id="postContainer"></div>
+
+<!-- ▸ 图片灯箱 -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <span class="lightbox-close">✕</span>
+    <img id="lightboxImg" src="" alt="">
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════╗
+// ║  📝 如何添加新的徒步记录（超简单！）                     ║
+// ║  1. 在 GitHub 上打开这个文件 (index.html)              ║
+// ║  2. 点右上角铅笔图标 ✏️ 进入编辑模式                    ║
+// ║  3. 找到下方 "➕ 在这里加新记录" 的注释位置             ║
+// ║  4. 复制一个 { ... } 块，填入你的信息                   ║
+// ║  5. 点 "Commit changes" 保存                          ║
+// ║  6. 等约30秒，网站自动更新！                            ║
+// ╚══════════════════════════════════════════════════════╝
+
+const POSTS = [
+
+    // ════════════════════════════════════════
+    //  示例记录（可以直接修改成你第一次徒步的信息）
+    // ════════════════════════════════════════
+    {
+        date:       "2026-03-29",       // 日期（格式：YYYY-MM-DD）
+        title:      "第一步：高东樱花园初探",
+        location:   "上海·高东镇",
+        distance:   5.2,                // 距离（公里，数字）
+        duration:   2.0,                // 时长（小时，数字）
+        difficulty: "easy",             // 难度：easy / medium / hard
+        coverEmoji: "🌸",              // 没有封面图时显示的emoji
+        cover:      "",                 // 封面图片 URL（没有就留空 ""）
+        description: "带着女儿第一次去高东樱花园徒步，樱花正值盛放期，粉白相间非常漂亮。她担任了小队长全程负责，一路上认真完成了拍照任务，还发现了四叶草——超级幸运的一天！",
+        highlights: [
+            "发现了蝴蝶、蜜蜂、瓢虫3种昆虫",
+            "走了约8000步，女儿全程自己走完",
+            "找到了一朵四叶草（超级幸运）",
+            "全家福打卡成功"
+        ],
+        photos: [
+            // 把照片上传到 GitHub photos/ 文件夹后，填写路径，例如：
+            // "photos/2026-0329-1.jpg",
+            // "photos/2026-0329-2.jpg",
+        ],
+        mapUrl: "https://uri.amap.com/marker?position=121.5920,31.3520&name=高东樱花园&callnative=1"
+    },
+
+    // ════════════════════════════════════════
+    // ➕ 在这里加新记录（复制上面的 { } 块）
+    // ════════════════════════════════════════
+
+];
+
+// ══════════════════════════════════════════════
+//  以下代码不需要修改
+// ══════════════════════════════════════════════
+let activeFilter = 'all';
+
+function diffLabel(d) {
+    return { easy: "轻松", medium: "适中", hard: "挑战" }[d] || d;
+}
+function fmtHours(h) {
+    if (!h) return '—';
+    if (h < 1) return Math.round(h * 60) + '分钟';
+    return h % 1 === 0 ? h + '小时' : h.toFixed(1) + '小时';
+}
+
+function calcStats() {
+    const count = POSTS.length;
+    const km    = POSTS.reduce((s, p) => s + (parseFloat(p.distance) || 0), 0);
+    const hours = POSTS.reduce((s, p) => s + (parseFloat(p.duration) || 0), 0);
+    const places = new Set(POSTS.map(p => p.location)).size;
+
+    document.getElementById('statCount').textContent  = count;
+    document.getElementById('statKm').textContent     = km % 1 === 0 ? km : km.toFixed(1);
+    document.getElementById('statPlaces').textContent = places;
+    document.getElementById('statHours').textContent  = hours % 1 === 0 ? hours : hours.toFixed(1);
+}
+
+function filterPosts(f, btn) {
+    activeFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderPosts();
+}
+
+function renderPosts() {
+    const container = document.getElementById('postContainer');
+    let filtered = [...POSTS].sort((a, b) => b.date.localeCompare(a.date));
+    if (activeFilter !== 'all') filtered = filtered.filter(p => p.difficulty === activeFilter);
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="e-icon">🥾</div><p>还没有' +
+            (activeFilter !== 'all' ? '「' + diffLabel(activeFilter) + '」' : '') +
+            '难度的记录<br>快去出发吧！</p></div>';
+        return;
+    }
+
+    let html = '';
+    let curYear = '';
+
+    filtered.forEach((p, idx) => {
+        const yr = p.date.substring(0, 4);
+        if (yr !== curYear) {
+            curYear = yr;
+            html += `<div class="year-sep">${yr} 年</div>`;
+        }
+
+        // 封面
+        const coverHtml = p.cover
+            ? `<img class="post-cover" src="${p.cover}" alt="${p.title}" loading="lazy">`
+            : `<div class="post-cover-emoji" style="background:linear-gradient(135deg,${coverBg(p.difficulty)})">${p.coverEmoji || '🌿'}</div>`;
+
+        // 亮点
+        const hlHtml = p.highlights && p.highlights.length
+            ? '<ul class="highlights">' + p.highlights.map(h => `<li>${h}</li>`).join('') + '</ul>'
+            : '';
+
+        // 照片
+        const photoHtml = p.photos && p.photos.length
+            ? '<div class="photo-grid">' + p.photos.slice(0, 6).map(src =>
+                `<img src="${src}" alt="photo" loading="lazy" onclick="openLightbox('${src}');event.stopPropagation();">`
+              ).join('') + '</div>'
+            : '';
+
+        // 地图按钮
+        const mapHtml = p.mapUrl
+            ? `<a class="map-btn" href="${p.mapUrl}" target="_blank" onclick="event.stopPropagation()">📍 打开导航</a>`
+            : '';
+
+        html += `
+        <div class="post-card" id="card-${idx}" onclick="toggleCard(${idx})">
+            ${coverHtml}
+            <div class="post-body">
+                <div class="post-meta">
+                    <span class="post-date">${p.date}</span>
+                    <span class="post-loc">${p.location}</span>
+                    <span class="diff-badge ${p.difficulty}">${diffLabel(p.difficulty)}</span>
+                </div>
+                <div class="post-title">${p.title}</div>
+                <div class="post-nums">
+                    <div class="post-num">🥾 <strong>${p.distance} km</strong></div>
+                    <div class="post-num">⏱ <strong>${fmtHours(p.duration)}</strong></div>
+                </div>
+                <div class="post-excerpt">${p.description}</div>
+                ${(hlHtml || photoHtml || mapHtml) ? '<div class="expand-hint">展开更多 <span class="arrow">▾</span></div>' : ''}
+            </div>
+            <div class="post-detail">
+                <div class="detail-sep"></div>
+                ${hlHtml}
+                ${photoHtml}
+                <div class="action-row">${mapHtml}</div>
+            </div>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function coverBg(d) {
+    return { easy: "#D1FAE5, #A7F3D0", medium: "#FEF3C7, #FDE68A", hard: "#FEE2E2, #FECACA" }[d] || "#D1FAE5, #A7F3D0";
+}
+
+function toggleCard(idx) {
+    const card = document.getElementById('card-' + idx);
+    if (card) card.classList.toggle('open');
+}
+
+function openLightbox(src) {
+    document.getElementById('lightboxImg').src = src;
+    document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox() {
+    document.getElementById('lightbox').classList.remove('show');
+}
+
+calcStats();
+renderPosts();
+</script>
+</body>
+</html>
